@@ -26,6 +26,7 @@ import com.circle.modularwallets.core.apis.bundler.BundlerApi
 import com.circle.modularwallets.core.apis.bundler.BundlerApiImpl
 import com.circle.modularwallets.core.apis.bundler.toResult
 import com.circle.modularwallets.core.apis.bundler.toUserOperationReceipt
+import com.circle.modularwallets.core.apis.modular.ModularApi
 import com.circle.modularwallets.core.apis.modular.ModularApiImpl
 import com.circle.modularwallets.core.apis.public.PublicApi
 import com.circle.modularwallets.core.apis.public.PublicApiImpl
@@ -71,6 +72,7 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
     private val api: BundlerApi = BundlerApiImpl
     private val pubApi: PublicApi = PublicApiImpl
     private val utilApi: UtilApi = UtilApiImpl
+    private val modularApi: ModularApi = ModularApiImpl
 
     /**
      * Estimates the gas values for a User Operation to be executed successfully.
@@ -306,43 +308,12 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
         if (!isAddress(recoveryAddress)) {
             throw BaseError("Invalid recovery address format")
         }
-        /** Step 1: Create a mapping between the MSCA address and the recovery address */
         val owners: Array<AddressMappingOwner> =
             arrayOf(EoaAddressMappingOwner(EOAIdentifier(recoveryAddress)))
-        try {
-            createAddressMapping(account.getAddress(), owners)
-        } catch (error: InvalidParamsRpcError) {
-            /**
-             * Ignore "address mapping already exists" errors to ensure idempotency and allow safe retries.
-             * This prevents inconsistent states between RPC calls and onchain transactions.
-             */
-            if (!isMappedError(error)) {
-                throw BaseError("Failed to register the recovery address. Please try again.", BaseErrorParameters(error))
-            }
-        }
-
-        /** Step 2: Encode the function call for the userOp */
         val addOwnersData = getAddOwnersData(recoveryAddress)
-
-        /** Step 3: Send user operation to store the recovery address onchain */
-        try {
-            partialUserOp.callData = addOwnersData
-            return sendUserOperation(
-                context,
-                account,
-                calls = null,// Set to null since callData is assigned directly.
-                partialUserOp,
-                paymaster,
-                estimateFeesPerGas
-            )
-        } catch (error: UserOperationExecutionError) {
-            if (error.details == ExecutionRevertedError.message) {
-                val isOwner =
-                    UtilApiImpl.isOwnerOf(transport, account.getAddress(), recoveryAddress)
-                if (isOwner) return null
-            }
-            throw error
-        }
+        return executeRecoveryFlow(
+            context, account, owners, addOwnersData, partialUserOp, paymaster, estimateFeesPerGas
+        ) { utilApi.isOwnerOf(transport, account.getAddress(), recoveryAddress) }
     }
 
     /**
@@ -377,12 +348,31 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
         } catch (e: Exception) {
             throw BaseError("Invalid public key: failed to parse P256 signature", BaseErrorParameters(e))
         }
-        /** Step 1: Create a mapping between the MSCA address and the WebAuthn credential */
         val owners: Array<AddressMappingOwner> = arrayOf(
             WebAuthnAddressMappingOwner(
                 WebAuthnIdentifier(x.toString(), y.toString())
             )
         )
+        val addOwnersData = getAddOwnersData(credential)
+        return executeRecoveryFlow(
+            context, account, owners, addOwnersData, partialUserOp, paymaster, estimateFeesPerGas
+        ) { utilApi.isOwnerOf(transport, account.getAddress(), x.toString(), y.toString()) }
+    }
+
+    /**
+     * Shared skeleton for recovery flows: create address mapping, send UserOp, handle idempotency.
+     */
+    private suspend fun executeRecoveryFlow(
+        context: Context,
+        account: SmartAccount,
+        owners: Array<AddressMappingOwner>,
+        addOwnersData: String,
+        partialUserOp: UserOperationV07,
+        paymaster: Paymaster?,
+        estimateFeesPerGas: (suspend (SmartAccount, BundlerClient, UserOperationV07) -> EstimateFeesPerGasResult)?,
+        isAlreadyOwner: suspend () -> Boolean
+    ): String? {
+        /** Step 1: Create a mapping between the MSCA address and the owner */
         try {
             createAddressMapping(account.getAddress(), owners)
         } catch (error: InvalidParamsRpcError) {
@@ -395,25 +385,20 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
             }
         }
 
-        /** Step 2: Encode the function call for the userOp */
-        val addOwnersData = getAddOwnersData(credential)
-
-        /** Step 3: Send user operation to store the recovery address onchain */
+        /** Step 2: Send user operation to store the owner onchain */
         try {
             partialUserOp.callData = addOwnersData
             return sendUserOperation(
                 context,
                 account,
-                calls = null,// Set to null since callData is assigned directly.
+                calls = null, // Set to null since callData is assigned directly.
                 partialUserOp,
                 paymaster,
                 estimateFeesPerGas
             )
         } catch (error: UserOperationExecutionError) {
             if (error.details == ExecutionRevertedError.message) {
-                val isOwner =
-                    UtilApiImpl.isOwnerOf(transport, account.getAddress(), x.toString(), y.toString())
-                if (isOwner) return null
+                if (isAlreadyOwner()) return null
             }
             throw error
         }
@@ -641,7 +626,7 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
         walletAddress: String,
         owners: Array<AddressMappingOwner>
     ): Array<AddressMappingResult> {
-        return ModularApiImpl.createAddressMapping(transport, walletAddress, owners)
+        return modularApi.createAddressMapping(transport, walletAddress, owners)
     }
 
     /**
@@ -655,7 +640,7 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
     suspend fun getAddressMapping(
         owner: AddressMappingOwner
     ): Array<AddressMappingResult> {
-        return ModularApiImpl.getAddressMapping(transport, owner)
+        return modularApi.getAddressMapping(transport, owner)
     }
     
     /**
@@ -666,6 +651,6 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
     @Throws(Exception::class)
     @JvmOverloads
     suspend fun getUserOperationGasPrice(): GetUserOperationGasPriceResult {
-        return ModularApiImpl.getUserOperationGasPrice(transport)
+        return modularApi.getUserOperationGasPrice(transport)
     }
 }
