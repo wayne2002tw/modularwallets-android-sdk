@@ -229,7 +229,11 @@ internal object BundlerApiImpl : BundlerApi {
                 }
             }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            if (e is BaseError) throw e
+            throw BaseError(
+                "Failed to estimate gas fees for UserOperation",
+                BaseErrorParameters(cause = e)
+            )
         }
 
         if (partialUserOp.nonce == null) {
