@@ -19,6 +19,7 @@
 package com.circle.modularwallets.core.utils.signature
 
 import com.circle.modularwallets.core.errors.BaseError
+import com.circle.modularwallets.core.errors.BaseErrorParameters
 import com.circle.modularwallets.core.models.EIP712Message
 import com.circle.modularwallets.core.models.Entry
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -281,8 +282,10 @@ internal class StructuredDataEncoder(val jsonMessageObject: EIP712Message) {
                 hashBytes = Numeric.toBytesPadded(bi, 32)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
-            hashBytes = ByteArray(0)
+            throw BaseError(
+                "Failed to encode value for type $baseType",
+                BaseErrorParameters(cause = e)
+            )
         }
 
         return hashBytes
