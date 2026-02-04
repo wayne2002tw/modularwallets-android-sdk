@@ -34,6 +34,8 @@ import com.circle.modularwallets.core.apis.util.UtilApi
 import com.circle.modularwallets.core.apis.util.UtilApiImpl
 import com.circle.modularwallets.core.chains.Chain
 import com.circle.modularwallets.core.constants.CIRCLE_PLUGIN_ADD_OWNERS_ABI
+import com.circle.modularwallets.core.constants.DEFAULT_POLLING_INTERVAL_MS
+import com.circle.modularwallets.core.constants.DEFAULT_RECEIPT_RETRY_COUNT
 import com.circle.modularwallets.core.constants.OWNER_WEIGHT
 import com.circle.modularwallets.core.errors.BaseError
 import com.circle.modularwallets.core.errors.BaseErrorParameters
@@ -449,8 +451,8 @@ class BundlerClient(chain: Chain, transport: Transport) : Client(chain, transpor
     @JvmOverloads
     suspend fun waitForUserOperationReceipt(
         userOpHash: String,
-        pollingInterval: Long = 4000,
-        retryCount: Int = 6,
+        pollingInterval: Long = DEFAULT_POLLING_INTERVAL_MS,
+        retryCount: Int = DEFAULT_RECEIPT_RETRY_COUNT,
         timeout: Long? = null
     ): UserOperationReceipt {
         return api.waitForUserOperationReceipt(

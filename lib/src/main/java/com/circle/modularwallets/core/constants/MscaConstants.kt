@@ -27,6 +27,10 @@ import java.math.BigInteger
 val MINIMUM_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(100_000)
 val MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT = BigInteger.valueOf(1_500_000)
 
+// Default polling behaviour for waitForUserOperationReceipt.
+val DEFAULT_POLLING_INTERVAL_MS: Long = 4000L
+val DEFAULT_RECEIPT_RETRY_COUNT: Int = 6
+
 // Chain-specific overrides — pending upstream sync for verified values.
 val SEPOLIA_MINIMUM_VERIFICATION_GAS_LIMIT = MINIMUM_VERIFICATION_GAS_LIMIT
 val SEPOLIA_MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT = MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT
