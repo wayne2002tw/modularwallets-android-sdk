@@ -128,7 +128,7 @@ Implementations are **singletons** (object classes). They receive a `Transport` 
 ### Key Design Patterns
 - **Delegate Pattern:** `CircleSmartAccount` → `CircleSmartAccountDelegate` subclasses. Keeps the public account class thin.
 - **Factory Functions:** Account creation is done via extension/top-level functions, not constructors. This allows `suspend` calls during initialization.
-- **Interface-based APIs:** Every API module has a clean interface. Impls are hardcoded object singletons — currently unmockable. Target for DI refactoring.
+- **Interface-based APIs:** Every API module has a clean interface. Impls are `object` singletons; all call sites route through interface-typed fields (e.g., `private val api: BundlerApi = BundlerApiImpl`), making the indirection point visible and replaceable.
 
 ### Utils (`utils/`)
 Organized into sub-packages by domain: `signature/`, `encoding/`, `abi/`, `webauthn/`, `userOperation/`, `smartAccount/`, `unit/`, `rpc/`, `data/`, `error/`. These are **stateless utility functions**, not classes with lifecycle.
@@ -140,9 +140,9 @@ Organized into sub-packages by domain: `signature/`, `encoding/`, `abi/`, `webau
 - **androidx.credentials** — Android WebAuthn / Passkey APIs
 
 ### What's Missing
-- No unit test files exist currently (`lib/src/test/` is empty)
+- Unit test coverage is minimal — only `NonceManagerTest.kt` exists under `lib/src/test/`
 - No instrumented test files exist currently
-- Test frameworks (JUnit, Mockito, Coroutines Test) are configured in `build.gradle.kts` but unused
+- Test frameworks (JUnit, Mockito, Coroutines Test) are configured in `build.gradle.kts` but largely unused
 
 ---
 
@@ -154,31 +154,25 @@ The following defines the refactoring goals and rules for this project. All tech
 
 The SDK already uses Kotlin Coroutines (`suspend functions`) as its primary async mechanism — 169 suspend functions across the codebase. There is no Java code, no RxJava, and no Callback pattern. The modernization targets are specific, identified issues below.
 
-### Refactoring Targets (by priority)
+### Refactoring Targets (by priority) — all completed ✅
 
-**Priority 1 — Error Handling (Safety Risk)**
-- Exceptions swallowed via `printStackTrace()` and empty catch blocks — failures are invisible to callers
-- Affected files: `StructuredDataEncoder.kt`, `BundlerApiImpl.kt`, `RetrofitProviderUtils.kt`
-- Target: Proper error propagation using the existing `BaseError` hierarchy
+**Priority 1 — Error Handling ✅**
+- Replaced `printStackTrace()` and empty catch blocks with `BaseError` propagation in `StructuredDataEncoder.kt`, `BundlerApiImpl.kt`, `RetrofitProviderUtils.kt`
 
-**Priority 2 — Architecture**
-- `BundlerClient` is a God Class (671 lines, 70+ methods) mixing UO operations, balance queries, recovery, and address mapping
-- Business logic and API calls are mixed within the same methods — makes isolated testing impossible
-- Target: Split into focused, single-responsibility clients; separate business logic from API calls
+**Priority 2 — Architecture ✅**
+- Extracted shared recovery skeleton (`executeRecoveryFlow`) from `BundlerClient`; aligned all internal API access through interface-typed fields
 
-**Priority 3 — Flow Adoption**
-- Polling loops (e.g., `waitForUserOperationReceipt`) are hand-written with manual retry — convert to `Flow` with retry/timeout operators
-- `NonceManager` state changes have no notification mechanism — introduce `StateFlow`
+**Priority 3 — Flow Adoption ✅**
+- Replaced hand-written polling loop in `waitForUserOperationReceipt` with a `Flow`-based `pollForReceipt` producer
+- Exposed `NonceManager` state via `StateFlow<Map<String, BigInteger>>`; added `NonceManagerTest.kt`
 
-**Priority 4 — Dependency Injection**
-- All API Impls are `object` singletons hardcoded into clients (`= BundlerApiImpl`) — unmockable, untestable
-- `NonceManager` has a broken implementation: empty `set()`, `get()` returns `System.currentTimeMillis()`
-- Target: Constructor injection for all dependencies
+**Priority 4 — Dependency Injection ✅**
+- Routed all 22 direct singleton references through interface-typed fields across API, Account, Delegate, and Util layers
+- Note: `public` classes (`BundlerClient`, `PaymasterClient`, `CircleSmartAccount`) retain body-property defaults — Kotlin forbids exposing `internal` interface types in public constructor signatures
 
-**Priority 5 — Code Quality**
-- Magic numbers: `pollingInterval = 4000`, `retryCount = 6` — extract to named constants
-- `Context` passed through call chains without lifecycle safety checks
-- Logging inconsistency: most files use `printStackTrace()`, only 3 files use Logger — unify
+**Priority 5 — Code Quality ✅**
+- Extracted `DEFAULT_POLLING_INTERVAL_MS` and `DEFAULT_RECEIPT_RETRY_COUNT` into `MscaConstants.kt`
+- Audit confirmed: `Context` is never stored as a field (passed transiently through suspend calls only); no lifecycle risk. `printStackTrace()` fully eliminated in Priority 1
 
 ### Role: Architecture Mentor
 All responses and refactoring suggestions should come from a "mentor" perspective — not just code, but the reasoning behind it.
