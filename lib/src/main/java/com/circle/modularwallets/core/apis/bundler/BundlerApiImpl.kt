@@ -20,6 +20,7 @@ package com.circle.modularwallets.core.apis.bundler
 
 import com.circle.modularwallets.core.accounts.SmartAccount
 import com.circle.modularwallets.core.annotation.ExcludeFromGeneratedCCReport
+import com.circle.modularwallets.core.apis.paymaster.PaymasterApi
 import com.circle.modularwallets.core.apis.paymaster.PaymasterApiImpl
 import com.circle.modularwallets.core.apis.public.FeeValuesType
 import com.circle.modularwallets.core.apis.public.PublicApi
@@ -55,6 +56,7 @@ import java.math.BigInteger
 
 internal object BundlerApiImpl : BundlerApi {
     private val publicApi: PublicApi = PublicApiImpl
+    private val paymasterApi: PaymasterApi = PaymasterApiImpl
     override suspend fun <T : UserOperation> estimateUserOperationGas(
         transport: Transport,
         userOp: T,
@@ -262,7 +264,7 @@ internal object BundlerApiImpl : BundlerApi {
         if (paymaster != null) {
             val stubR = when (paymaster) {
                 is Paymaster.True -> {
-                    PaymasterApiImpl.getPaymasterStubData(
+                    paymasterApi.getPaymasterStubData(
                         transport,
                         userOp,
                         account.entryPoint,
@@ -272,7 +274,7 @@ internal object BundlerApiImpl : BundlerApi {
                 }
 
                 is Paymaster.Client -> {
-                    PaymasterApiImpl.getPaymasterStubData(
+                    paymasterApi.getPaymasterStubData(
                         paymaster.client.transport,
                         userOp,
                         account.entryPoint,
@@ -327,7 +329,7 @@ internal object BundlerApiImpl : BundlerApi {
         if (paymaster != null && !isPaymasterPopulated) {
             val r = when (paymaster) {
                 is Paymaster.True -> {
-                    PaymasterApiImpl.getPaymasterData(
+                    paymasterApi.getPaymasterData(
                         transport,
                         userOp,
                         account.entryPoint,
@@ -337,7 +339,7 @@ internal object BundlerApiImpl : BundlerApi {
                 }
 
                 is Paymaster.Client -> {
-                    PaymasterApiImpl.getPaymasterData(
+                    paymasterApi.getPaymasterData(
                         paymaster.client.transport,
                         userOp,
                         account.entryPoint,

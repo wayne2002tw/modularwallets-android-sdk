@@ -19,7 +19,8 @@
 package com.circle.modularwallets.core.apis.util
 
 import com.circle.modularwallets.core.annotation.ExcludeFromGeneratedCCReport
-import com.circle.modularwallets.core.apis.public.PublicApiImpl.call
+import com.circle.modularwallets.core.apis.public.PublicApi
+import com.circle.modularwallets.core.apis.public.PublicApiImpl
 import com.circle.modularwallets.core.constants.CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN
 import com.circle.modularwallets.core.constants.EIP1271_VALID_SIGNATURE
 import com.circle.modularwallets.core.errors.BaseError
@@ -46,6 +47,7 @@ import org.web3j.utils.Numeric
 import java.math.BigInteger
 
 internal object UtilApiImpl : UtilApi {
+    private val publicApi: PublicApi = PublicApiImpl
     override suspend fun getAddress(
         transport: Transport,
         to: String,
@@ -62,7 +64,7 @@ internal object UtilApiImpl : UtilApi {
         )
         val data = FunctionEncoder.encode(function)
         Logger.d(msg = "getAddress > call")
-        val resp = call(transport, null, to, data)
+        val resp = publicApi.call(transport, null, to, data)
         val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
         return Pair(decoded[0].value as String, Numeric.toHexString(decoded[1].value as ByteArray))
     }
@@ -86,7 +88,7 @@ internal object UtilApiImpl : UtilApi {
         )
         val data = FunctionEncoder.encode(function)
         Logger.d(msg = "createAccount > call")
-        val resp = call(transport, null, to, data)
+        val resp = publicApi.call(transport, null, to, data)
         val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
         return decoded[0].value as String
     }
@@ -104,7 +106,7 @@ internal object UtilApiImpl : UtilApi {
         )
         val data = FunctionEncoder.encode(function)
         Logger.d(msg = "getNonce > call")
-        val resp = call(transport, null, to, data)
+        val resp = publicApi.call(transport, null, to, data)
         return hexToBigInteger(resp) ?: throw BaseError("Failed to transform to BigInteger")
     }
 
@@ -143,7 +145,7 @@ internal object UtilApiImpl : UtilApi {
             To: $to
         """.trimIndent()
         )
-        val resp = call(transport, from, to, data)
+        val resp = publicApi.call(transport, from, to, data)
         val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
         if (decoded.isEmpty()) {
             Logger.w(msg = "Empty response from isValidSignature call")
@@ -175,7 +177,7 @@ internal object UtilApiImpl : UtilApi {
             OwnerToCheck: $ownerToCheck
         """.trimIndent()
         )
-        val resp = call(
+        val resp = publicApi.call(
             transport,
             from = account,
             to = CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN.address,
@@ -217,7 +219,7 @@ internal object UtilApiImpl : UtilApi {
             yOfOwnerToCheck: $yOfOwnerToCheck
         """.trimIndent()
         )
-        val resp = call(
+        val resp = publicApi.call(
             transport,
             from = account,
             to = CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN.address,
@@ -249,7 +251,7 @@ internal object UtilApiImpl : UtilApi {
                 object : TypeReference<Bytes32>() {})
         )
         val data = FunctionEncoder.encode(function)
-        val resp = call(transport, account, account, data)
+        val resp = publicApi.call(transport, account, account, data)
         val decoded = FunctionReturnDecoder.decode(resp, function.outputParameters)
         if (decoded.isEmpty()) {
             throw BaseError("Invalid account or empty response for: $account. Response: $resp")

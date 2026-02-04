@@ -20,10 +20,12 @@ package com.circle.modularwallets.core.accounts.implementations
 
 import android.content.Context
 import com.circle.modularwallets.core.accounts.LocalAccount
+import com.circle.modularwallets.core.apis.modular.ModularApi
 import com.circle.modularwallets.core.apis.modular.ModularApiImpl
 import com.circle.modularwallets.core.apis.modular.ModularWallet
 import com.circle.modularwallets.core.apis.modular.ScaConfiguration
 import com.circle.modularwallets.core.apis.modular.getCreateWalletReq
+import com.circle.modularwallets.core.apis.util.UtilApi
 import com.circle.modularwallets.core.apis.util.UtilApiImpl
 import com.circle.modularwallets.core.clients.Client
 import com.circle.modularwallets.core.constants.CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN
@@ -87,11 +89,13 @@ internal class LocalCircleSmartAccountDelegate(val owner: LocalAccount) :
 
     companion object {
         const val WALLET_PREFIX = "wallet"
+        private val modularApi: ModularApi = ModularApiImpl
+        private val utilApi: UtilApi = UtilApiImpl
         internal suspend fun getModularWalletAddress(
             transport: Transport, address: String, version: String, name: String? = null
         ): ModularWallet {
             val wallet =
-                ModularApiImpl.getAddress(
+                modularApi.getAddress(
                     transport,
                     getCreateWalletReq(address, version, name)
                 )
@@ -106,7 +110,7 @@ internal class LocalCircleSmartAccountDelegate(val owner: LocalAccount) :
             val initializeUpgradableMSCAParams = getInitializeUpgradableMSCAParams(address)
 
             /** address, mixedSalt */
-            val result = UtilApiImpl.getAddress(
+            val result = utilApi.getAddress(
                 transport,
                 FACTORY.address,
                 Numeric.hexStringToByteArray(sender),

@@ -26,7 +26,9 @@ import com.circle.modularwallets.core.accounts.implementations.LocalCircleSmartA
 import com.circle.modularwallets.core.accounts.implementations.WebAuthnCircleSmartAccountDelegate
 import com.circle.modularwallets.core.annotation.ExcludeFromGeneratedCCReport
 import com.circle.modularwallets.core.apis.modular.ModularWallet
+import com.circle.modularwallets.core.apis.public.PublicApi
 import com.circle.modularwallets.core.apis.public.PublicApiImpl
+import com.circle.modularwallets.core.apis.util.UtilApi
 import com.circle.modularwallets.core.apis.util.UtilApiImpl
 import com.circle.modularwallets.core.clients.Client
 import com.circle.modularwallets.core.constants.CIRCLE_SMART_ACCOUNT_VERSION
@@ -153,6 +155,8 @@ class CircleSmartAccount(
 ) : SmartAccount(client, entryPoint) {
 
     private var deployed = false
+    private val publicApi: PublicApi = PublicApiImpl
+    private val utilApi: UtilApi = UtilApiImpl
     private val nonceManager = NonceManager(object : NonceManagerSource {
         override fun get(parameters: FunctionParameters): BigInteger {
             return BigInteger.valueOf(System.currentTimeMillis())
@@ -220,7 +224,7 @@ class CircleSmartAccount(
             return true
         }
         try {
-            val byteCode = PublicApiImpl.getCode(client.transport, getAddress())
+            val byteCode = publicApi.getCode(client.transport, getAddress())
             deployed = Numeric.hexStringToByteArray(byteCode).isNotEmpty()
             return deployed
         } catch (e: Throwable) {
@@ -240,7 +244,7 @@ class CircleSmartAccount(
         val notNullKey =
             key ?: nonceManager.consume(FunctionParameters(getAddress(), client.chain.chainId))
         val nonce =
-            UtilApiImpl.getNonce(client.transport, getAddress(), entryPoint.address, notNullKey)
+            utilApi.getNonce(client.transport, getAddress(), entryPoint.address, notNullKey)
         return nonce
     }
 
@@ -265,7 +269,7 @@ class CircleSmartAccount(
     @Throws(Exception::class)
     override suspend fun sign(context: Context, messageHash: String): String {
         val replaySafeMessageHash =
-            UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), messageHash)
+            utilApi.getReplaySafeMessageHash(client.transport, getAddress(), messageHash)
         return delegate.signAndWrap(context, replaySafeMessageHash, false)
     }
 
@@ -281,7 +285,7 @@ class CircleSmartAccount(
     override suspend fun signMessage(context: Context, message: String): String {
         val hashedMessage = hashMessage(message.toByteArray())
         val replaySafeMessageHash =
-            UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), hashedMessage)
+            utilApi.getReplaySafeMessageHash(client.transport, getAddress(), hashedMessage)
         return delegate.signAndWrap(context, replaySafeMessageHash, false)
     }
 
@@ -297,7 +301,7 @@ class CircleSmartAccount(
     override suspend fun signTypedData(context: Context, typedData: String): String {
         val hashedTypedData = hashTypedData(typedData)
         val replaySafeMessageHash =
-            UtilApiImpl.getReplaySafeMessageHash(client.transport, getAddress(), hashedTypedData)
+            utilApi.getReplaySafeMessageHash(client.transport, getAddress(), hashedTypedData)
         return delegate.signAndWrap(context, replaySafeMessageHash, false)
     }
 

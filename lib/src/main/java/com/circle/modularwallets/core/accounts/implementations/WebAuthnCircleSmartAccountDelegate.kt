@@ -20,10 +20,12 @@ package com.circle.modularwallets.core.accounts.implementations
 
 import android.content.Context
 import com.circle.modularwallets.core.accounts.WebAuthnAccount
+import com.circle.modularwallets.core.apis.modular.ModularApi
 import com.circle.modularwallets.core.apis.modular.ModularApiImpl
 import com.circle.modularwallets.core.apis.modular.ModularWallet
 import com.circle.modularwallets.core.apis.modular.ScaConfiguration
 import com.circle.modularwallets.core.apis.modular.getCreateWalletReq
+import com.circle.modularwallets.core.apis.util.UtilApi
 import com.circle.modularwallets.core.apis.util.UtilApiImpl
 import com.circle.modularwallets.core.clients.Client
 import com.circle.modularwallets.core.constants.CIRCLE_WEIGHTED_WEB_AUTHN_MULTISIG_PLUGIN
@@ -102,6 +104,8 @@ internal class WebAuthnCircleSmartAccountDelegate(val owner: WebAuthnAccount) :
     companion object {
         const val WALLET_PREFIX = "passkey"
         const val DYNAMIC_POSITION = 65L
+        private val modularApi: ModularApi = ModularApiImpl
+        private val utilApi: UtilApi = UtilApiImpl
         fun getInitializeUpgradableMSCAParams(x: BigInteger, y: BigInteger): String {
             val pluginInstallParams = getPluginInstallParams(x, y)
             val encoded = encodeAbiParameters(
@@ -237,7 +241,7 @@ internal class WebAuthnCircleSmartAccountDelegate(val owner: WebAuthnAccount) :
             val initializeUpgradableMSCAParams = getInitializeUpgradableMSCAParams(x, y)
 
             /** address, mixedSalt */
-            val result = UtilApiImpl.getAddress(
+            val result = utilApi.getAddress(
                 transport,
                 FACTORY.address,
                 Numeric.hexStringToByteArray(sender),
@@ -267,7 +271,7 @@ internal class WebAuthnCircleSmartAccountDelegate(val owner: WebAuthnAccount) :
         ): ModularWallet {
             val (x, y) = parseP256Signature(hexPublicKey)
             val wallet =
-                ModularApiImpl.getAddress(
+                modularApi.getAddress(
                     transport,
                     getCreateWalletReq(x.toString(), y.toString(), version, name)
                 )

@@ -18,6 +18,7 @@
 
 package com.circle.modularwallets.core.apis.public
 
+import com.circle.modularwallets.core.apis.util.UtilApi
 import com.circle.modularwallets.core.apis.util.UtilApiImpl
 import com.circle.modularwallets.core.errors.BaseError
 import com.circle.modularwallets.core.models.Block
@@ -33,6 +34,7 @@ import kotlin.math.ceil
 import kotlin.math.pow
 
 internal object PublicApiImpl : PublicApi {
+    private val utilApi: UtilApi = UtilApiImpl
 
     override suspend fun getChainId(transport: Transport): String {
         val req = RpcRequest("eth_chainId")
@@ -166,7 +168,7 @@ internal object PublicApiImpl : PublicApi {
         block: Block
     ): BigInteger {
         return try {
-            UtilApiImpl.getMaxPriorityFeePerGas(transport)
+            utilApi.getMaxPriorityFeePerGas(transport)
         } catch (e: Throwable) {
             estimateMaxPriorityFeePerGasFallback(transport, block)
         }

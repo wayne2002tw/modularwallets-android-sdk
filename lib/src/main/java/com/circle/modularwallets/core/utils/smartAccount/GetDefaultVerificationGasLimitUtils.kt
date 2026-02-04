@@ -19,6 +19,7 @@
 
 package com.circle.modularwallets.core.utils.smartAccount
 
+import com.circle.modularwallets.core.apis.modular.ModularApi
 import com.circle.modularwallets.core.apis.modular.ModularApiImpl
 import com.circle.modularwallets.core.constants.MINIMUM_UNDEPLOY_VERIFICATION_GAS_LIMIT
 import com.circle.modularwallets.core.constants.MINIMUM_VERIFICATION_GAS_LIMIT
@@ -38,7 +39,8 @@ suspend fun getDefaultVerificationGasLimit(
     transport: Transport
 ): BigInteger {
     return try {
-        val result: GetUserOperationGasPriceResult = ModularApiImpl.getUserOperationGasPrice(transport)
+        val modularApi: ModularApi = ModularApiImpl
+        val result: GetUserOperationGasPriceResult = modularApi.getUserOperationGasPrice(transport)
         if (deployed) {
             result.deployed ?: fallbackGasLimit(deployed)
         } else {
