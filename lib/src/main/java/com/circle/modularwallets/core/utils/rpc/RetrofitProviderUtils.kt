@@ -22,6 +22,7 @@ import android.content.Context
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import com.circle.modularwallets.core.BuildConfig
+import com.circle.modularwallets.core.utils.Logger
 import java.security.MessageDigest
 
 internal fun getAppInfo(context: Context): String {
@@ -45,7 +46,7 @@ internal fun getSha256CertificateFingerprint(context: Context): String? {
         val fingerprint = digest.joinToString(":") { String.format("%02X", it) }
         return fingerprint
     } catch (e: Exception) {
-        e.printStackTrace()
+        Logger.w("getSha256CertificateFingerprint", "Failed to get certificate fingerprint", e)
         return null
     }
 }
