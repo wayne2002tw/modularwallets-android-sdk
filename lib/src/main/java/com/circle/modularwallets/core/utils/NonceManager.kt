@@ -19,6 +19,8 @@
 package com.circle.modularwallets.core.utils
 
 import java.math.BigInteger
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 data class FunctionParameters(val address: String, val chainId: Long)
 
@@ -30,6 +32,9 @@ interface NonceManagerSource {
 internal class NonceManager(private val source: NonceManagerSource) {
     private val deltaMap = mutableMapOf<String, BigInteger>()
     private val nonceMap = mutableMapOf<String, BigInteger>()
+
+    private val _nonceState = MutableStateFlow<Map<String, BigInteger>>(emptyMap())
+    val nonceState: StateFlow<Map<String, BigInteger>> = _nonceState
 
     private fun getKey(params: FunctionParameters) = "${params.address}.${params.chainId}"
     /**
@@ -43,6 +48,7 @@ internal class NonceManager(private val source: NonceManagerSource) {
         val nonce = get(params)
         source.set(params, nonce)
         nonceMap[key] = nonce
+        _nonceState.value = HashMap(nonceMap)
         return nonce
     }
     /** Increase delta */
