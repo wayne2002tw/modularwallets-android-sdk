@@ -46,6 +46,10 @@ import com.circle.modularwallets.core.utils.rpc.performJsonRpcRequest
 import com.circle.modularwallets.core.utils.unit.parseGwei
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withTimeout
 import java.math.BigInteger
 
@@ -98,27 +102,16 @@ internal object BundlerApiImpl : BundlerApi {
         retryCount: Int,
         timeout: Long?
     ): UserOperationReceiptRpc {
-        try{
-            if (timeout != null) {
-                return withTimeout(timeout) {
-                    return@withTimeout startPolling(pollingInterval, retryCount) {
-                        try {
-                            return@startPolling getUserOperationReceipt(transport, userOpHash)
-                        } catch (e: UserOperationReceiptNotFoundError) {
-                            return@startPolling null
-                        }
-                    }
-                } ?: throw WaitForUserOperationReceiptTimeoutError(userOpHash)
+        try {
+            val poll = pollForReceipt(transport, userOpHash, pollingInterval, retryCount)
+                .filterNotNull()
+            val result = if (timeout != null) {
+                withTimeout(timeout) { poll.firstOrNull() }
             } else {
-                return startPolling(pollingInterval, retryCount) {
-                    try {
-                        return@startPolling getUserOperationReceipt(transport, userOpHash)
-                    } catch (e: UserOperationReceiptNotFoundError) {
-                        return@startPolling null
-                    }
-                } ?: throw WaitForUserOperationReceiptTimeoutError(userOpHash)
+                poll.firstOrNull()
             }
-        } catch (e: TimeoutCancellationException){
+            return result ?: throw WaitForUserOperationReceiptTimeoutError(userOpHash)
+        } catch (e: TimeoutCancellationException) {
             throw WaitForUserOperationReceiptTimeoutError(userOpHash)
         }
     }
@@ -149,6 +142,29 @@ internal object BundlerApiImpl : BundlerApi {
             UserOperationReceiptNotFoundError(userOpHash)
         )
         return result.first
+    }
+
+    private fun pollForReceipt(
+        transport: Transport,
+        userOpHash: String,
+        pollingInterval: Long,
+        retryCount: Int
+    ): Flow<UserOperationReceiptRpc?> = flow {
+        repeat(retryCount) { attempt ->
+            Logger.i("pollForReceipt", "Polling attempt: $attempt")
+            val receipt = try {
+                getUserOperationReceipt(transport, userOpHash)
+            } catch (e: UserOperationReceiptNotFoundError) {
+                null
+            }
+            emit(receipt)
+            if (receipt != null) {
+                Logger.i("pollForReceipt", "Polling got result: $attempt")
+                return@flow
+            }
+            delay(pollingInterval)
+        }
+        Logger.i("pollForReceipt", "Polling no result")
     }
 
     override suspend fun prepareUserOperation(
@@ -362,23 +378,4 @@ internal fun getUpdatedCalls(calls: Array<EncodeCallDataArg>): Array<EncodeCallD
         return@map call.dataUpdated()
     }.toTypedArray()
     return updatedCalls
-}
-internal suspend fun <T> startPolling(
-    pollingInterval: Long,
-    retryCount: Int,
-    block: suspend () -> T
-): T? {
-    var currentCount = 0
-    while (currentCount < retryCount) {
-        Logger.i("startPolling", "Polling currentCount: $currentCount")
-        val result = block()
-        if (result != null) {
-            Logger.i("startPolling", "Polling got result: $currentCount")
-            return result
-        }
-        currentCount++
-        delay(pollingInterval)
-    }
-    Logger.i("startPolling", "Polling no result")
-    return null
 }
